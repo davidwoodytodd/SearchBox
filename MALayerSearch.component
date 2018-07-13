@@ -3,7 +3,10 @@
     <apex:attribute name="SelectedIdVar" description="This is the value for the component." type="String" required="true" />
     <apex:attribute name="objTypes" description="These are the types of MAQuery records to search for." type="String" required="true" />
     <apex:attribute name="sectionId" description="This is the Id value passed in to use for reference." type="String" required="true" />
+    <apex:attribute name="sfObjTypes" description="These are the types of SF Objects to search for." type="String" required="false" />
     <apex:attribute name="objData" description="This holds the chosen obj record." type="map" required="false" />
+    <apex:attribute name="filterOutVariables" description="This is a boolean on rather to filter out queries with variables." type="Boolean" required="false" />
+    <apex:attribute name="requiresGeoLocation" description="This is a boolean on rather to filter out layers not using geolocation fields." type="Boolean" required="false" />
     <apex:attribute name="callbackFunc" description="This holds the name of the callback function." type="String" required="false" />
     
 
@@ -11,14 +14,20 @@
         <apex:param name="setId" value="" assignTo="{!SelectedIdVar}"/>
     </apex:actionFunction>
 
+    <style>
+        .slds-listbox {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
 
     <!-- <div class="slds-form-element">
         <label class="slds-form-element__label" for="combobox-unique-id"><abbr class="slds-required">*</abbr>MapAnything Live Device Layer</label> -->
-        <div class="slds-form-element__control slds-grid slds-size_3-of-5" id="{!sectionId}">
-            <div class="slds-combobox_container slds-has-inline-listbox" style="width:100%">
+        <div class="slds-form-element__control slds-grid" id="{!sectionId}">
+            <div class="slds-combobox_container slds-has-inline-listbox slds-m-right_xx-small">
                 <div id="{!sectionId}_combobox"  class="slds-combobox slds-dropdown-trigger slds-dropdown-trigger_click slds-combobox-lookup" aria-expanded="false" aria-haspopup="listbox" role="combobox">
                     <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right">
-                        <input onfocusout="SearchInputFocusOut('{!sectionId}')" onkeyup="doSearch(this,'{!sectionId}','{!objTypes}');" onfocus="searchInputFocus('{!sectionId}','{!objTypes}');" type="text" class="slds-input slds-combobox__input" id="{!sectionId}_field" aria-autocomplete="list" aria-controls="listbox-unique-id" autocomplete="off" role="textbox" placeholder="Search Salesforce"/>
+                        <input onfocusout="SearchInputFocusOut('{!sectionId}')" onkeyup="doSearch(this,'{!sectionId}','{!objTypes}','{!sfObjTypes}');" onfocus="searchInputFocus('{!sectionId}','{!objTypes}', this,'{!sfObjTypes}');" type="text" class="slds-input slds-combobox__input slds-truncate" id="{!sectionId}_field" aria-autocomplete="list" aria-controls="listbox-unique-id" autocomplete="off" role="textbox" placeholder="Search Salesforce"/>
                         <span class="slds-icon_container slds-icon-utility-search slds-input__icon slds-input__icon_right" title="Search for layers">
                             <svg class="slds-icon slds-icon slds-icon_x-small slds-icon-text-default" aria-hidden="true">
                                 <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="/apexpages/slds/latest/assets/icons/utility-sprite/svg/symbols.svg#search"></use>
@@ -27,13 +36,13 @@
                         </span>
                     </div>
                     <div id="{!sectionId}_listbox" role="listbox">
-                        <ul id="{!sectionId}_list-result-wrapper" class="slds-listbox slds-listbox_vertical slds-dropdown slds-dropdown_fluid" role="presentation">
+                        <ul id="{!sectionId}_list-result-wrapper" class="slds-listbox slds-listbox_vertical slds-dropdown" role="presentation" style="width: 300px;transform: none;left: 0;">
                             <li class="slds-listbox__item" role="presentation">Please type in the search box or press enter for all</li>
                         </ul>
                     </div>
                 </div>
             </div>
-            <div class="slds-box slds-box_x-small slds-media" id="{!sectionId}_malink" style="display:none; width:50%">
+            <div class="" id="{!sectionId}_malink" style="display:none;">
                 <!-- <svg class="slds-button__icon" aria-hidden="true">
                     <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="/apexpages/slds/latest/assets/icons/utility-sprite/svg/symbols.svg#close"></use>
                 </svg> -->
@@ -46,7 +55,8 @@
     
     <script>
 
-        /*document.addEventListener('DOMContentLoaded', function() 
+        /*
+        document.addEventListener('DOMContentLoaded', function() 
         {
             console.log('SelectedIdVar: {!SelectedIdVar}');
            
@@ -68,12 +78,15 @@
                 );
             }
            
-        }, false);*/
-        console.log('start reading MALayerSearch scripts');
+        }, false);
+        */
+        
+        //console.log('start reading MALayerSearch scripts');
 
         var Layers = {
             live : [],
-            geofence : []
+            geofence : [],
+            marker : []
         };
 
         var folderIds = folderIds | {};
@@ -81,7 +94,7 @@
     
         function SearchInputFocusOut(id)
         {
-            console.log('exit');
+            //console.log('exit');
             var el = document.getElementById(id + "_combobox");
             if(el.getAttribute('itemSelected')==null ||  !el.itemSelected)
             {
@@ -91,15 +104,19 @@
             }
         }
     
-        function searchInputFocus(id, objType)
+        function searchInputFocus(id, objType, inputBox, sfObjTypes)
         {
-            console.log('enter');
-            doSearch("", id, objType);
+            //console.log('enter');
+            //doSearch("", id, objType);
+            //doSearch({ 'value' : '' }, id, objType);
+            doSearch(inputBox, id, objType, sfObjTypes);
             //slds-has-input-focus
             var el = document.getElementById(id + "_combobox");
             el.classList.remove("slds-combobox-lookup");
             el.classList.add("slds-is-open");
         }
+        /*
+        Changed and in malive.utilities.js now
 
         function redirectToMA(layerId) {
             if(isLightningOrSForce1()) {
@@ -114,11 +131,12 @@
         function isLightningOrSForce1() {
             return((typeof sforce != 'undefined') && sforce && (!!sforce.one));
         }
+        */
                 
     
-        function clearSelected(id, objTypes, callback)
+        function clearSelected(id, objTypes, callback, sfObjTypes)
         {
-            console.log('clearSelected: ' + id);
+            //console.log('clearSelected: ' + id);
             var el = document.getElementById(id + "_combobox");
             el.setAttribute('itemSelected', false);
 
@@ -126,27 +144,30 @@
             
             el.classList.remove("slds-combobox-lookup");
             el.innerHTML = '<div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right">' + 
-                '<input onfocusout="SearchInputFocusOut(\'' + id + '\')" onkeyup="doSearch(this,\'' + id + '\',\'' + objTypes + '\');" onfocus="searchInputFocus(\'' + id + '\',\'' + objTypes + '\');" type="text" class="slds-input slds-combobox__input" id="' + id + '_field" aria-autocomplete="list" aria-controls="' + id + '_listbox" autocomplete="off" role="textbox" placeholder="Search Salesforce"/>' + 
+                '<input onfocusout="SearchInputFocusOut(\'' + id + '\')" onkeyup="doSearch(this,\'' + id + '\',\'' + objTypes + '\',\'' + sfObjTypes + '\');" onfocus="searchInputFocus(\'' + id + '\',\'' + objTypes + '\', this,\'' + sfObjTypes + '\');" type="text" class="slds-input slds-combobox__input slds-truncate" id="' + id + '_field" aria-autocomplete="list" aria-controls="' + id + '_listbox" autocomplete="off" role="textbox" placeholder="Search Salesforce"/>' + 
                 '<span class="slds-icon_container slds-icon-utility-search slds-input__icon slds-input__icon_right" title="Search for layers">' + 
                 '<svg class="slds-icon slds-icon slds-icon_x-small slds-icon-text-default" aria-hidden="true">' + 
                 '<use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="/apexpages/slds/latest/assets/icons/utility-sprite/svg/symbols.svg#search"></use>' + 
                 '</svg>' + 
                 '<span class="slds-assistive-text">Description of icon</span>' + 
                 '</span>' + 
-                '</div><div id="' + id + '_listbox" role="listbox"><ul id="' + id  +'_list-result-wrapper" class="slds-listbox slds-listbox_vertical slds-dropdown slds-dropdown_fluid" role="presentation">' +
+                '</div><div id="' + id + '_listbox" role="listbox"><ul id="' + id  +'_list-result-wrapper" class="slds-listbox slds-listbox_vertical slds-dropdown" role="presentation" style="width: 300px;transform: none;left: 0;">' +
                 '<li class="slds-listbox__item" role="presentation">Please type in the search box or press enter for all</li></ul></div>';
+            if ($(el).closest('.stopAssociationDiv').length > 0) {
+                $(el).closest('.stopAssociationDiv').find('input[id $= hiddenLayerId]').val('');
+            }
 
             if (callback) {
                 var fn = window[callback];
                 if (typeof(fn) === "function") {
-                    fn(null, true);
+                    fn(true);
                 }
             }
         }
     
         function actionFunctionOnComplete()
         {
-            console.log('SelectedIdVar var set' + '{!SelectedIdVar}');
+            //console.log('SelectedIdVar var set' + '{!SelectedIdVar}');
         }
 
         /*function getLayer(layerId, sectionId, objTypes) {
@@ -166,45 +187,42 @@
             );
         }*/
     
-        function itemSelected(id, name, itemid, vendor, objTypes, callback, clearFields)
+        function itemSelected(divid, name, recordid, vendor, objTypes, callback, clearFields, sfObjTypes)
         {
             
-            console.log('start itemselected: ' + id);
-            console.log('name: ' + name);
+            //console.log('start itemselected: ' + divid);
+            //console.log('name: ' + name);
 
             SelectedId = name;
-            eval(id+"setOwnerId('" + id + "')");
+            eval(divid+"setOwnerId('" + divid + "')");
             if (vendor) {
                 vendor = vendor.toLowerCase().replace(/\s/g,'');
             } 
             
-            var el = document.getElementById(id + "_combobox");
+            var el = document.getElementById(divid + "_combobox");
             el.setAttribute('itemSelected', 'true');  
             el.classList.remove("slds-combobox-lookup");
             el.classList.remove("slds-is-open");
 
             // add show in ma link
             if (objTypes.toLowerCase().indexOf("geofence") === -1) {
-                var malink = document.getElementById(id + '_malink');
-                malink.innerHTML = '<a href="javascript:void(0);" onclick="redirectToMA(\'' + itemid + '\');"><span aria-hidden="true" class="ma-icon ma-icon-map"></span><span>  View in MapAnything</span></a>';
+                var malink = document.getElementById(divid + '_malink');
+                malink.innerHTML = '<a class="slds-button slds-button_icon slds-button_icon-border-filled has-tooltip" href="javascript:void(0);" onclick="redirectPage(\'map\', \'' + recordid + '\');"><span class="ma-icon ma-icon-map slds-button__icon" style="line-height: 34px;font-size: 14px;"></span><div class="slds-popover slds-popover_tooltip slds-nubbin_bottom-left" role="tooltip" id="help" style="    position: absolute;bottom: calc(100% + 13px);left: -9px;top: auto;white-space: nowrap;min-height: 0;"><div class="slds-popover__body">Open in MapAnything</div></div></a>';
                 malink.style.display = "inline";
             }
 
-            el.innerHTML = '<div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_left-right">' + 
-                              '<span class="slds-icon_container slds-icon-standard-account slds-combobox__input-entity-icon" title="MA Layer">' + 
-                                '<svg class="slds-icon slds-icon_small" aria-hidden="true">' + 
-                                  '<use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="/apexpages/slds/latest/assets/icons/standard-sprite/svg/symbols.svg#account"></use>' + 
-                                '</svg>' + 
-                                '<span class="slds-assistive-text">MA Layer</span>' + 
-                              '</span>' + 
-                              '<input type="text" class="slds-input slds-combobox__input" id="' + id + '_field" aria-autocomplete="list" aria-controls="listbox-unique-id" autocomplete="off" role="textbox" placeholder="Search Salesforce" readonly="" value="' + name +'" aria-activedescendant="' + itemid + '" ma-vendor="' + vendor + '"/>' + 
-                              '<button class="slds-button slds-button_icon slds-input__icon slds-input__icon_right" title="Remove selected option" onclick="clearSelected(\'' + id + '\',\'' + objTypes + '\',\'' + callback + '\');">' + 
+            el.innerHTML = '<div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right">' + 
+                              '<input type="text" class="slds-input slds-combobox__input slds-truncate" id="' + divid + '_field" aria-autocomplete="list" aria-controls="listbox-unique-id" autocomplete="off" role="textbox" placeholder="Search Salesforce" readonly="" value="' + name +'" aria-activedescendant="' + recordid + '" ma-vendor="' + vendor + '"/>' + 
+                              '<button class="slds-button slds-button_icon slds-input__icon slds-input__icon_right" title="Remove selected option" onclick="clearSelected(\'' + divid + '\',\'' + objTypes + '\',\'' + callback + '\',\'' + sfObjTypes + '\');">' + 
                                 '<svg class="slds-button__icon" aria-hidden="true">' + 
                                   '<use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="/apexpages/slds/latest/assets/icons/utility-sprite/svg/symbols.svg#close"></use>' + 
                                 '</svg>' + 
                                 '<span class="slds-assistive-text">Remove selected option</span>' + 
                               '</button>' + 
                             '</div>';
+            if ($(el).closest('.stopAssociationDiv').length > 0) {
+                $(el).closest('.stopAssociationDiv').find('input[id $= hiddenLayerId]').val(recordid);
+            }
                             
             if (callback) {
                 var fn = window[callback];
@@ -212,15 +230,19 @@
                     fn(clearFields);
                 }
             }
-            console.log('leaving itemselected');
+            //console.log('leaving itemselected');
             return false;
         }
 
     
-        function doSearch(inputBox, id, objTypes) 
-        {
-            console.log('start doSearch: ' + id);
+        function doSearch(inputBox, id, objTypes, sfObjTypes) {
+            //console.log('start doSearch: ' + id);
+            console.log('inputBox: ' + inputBox);
+            console.log('id: ' + id);
             console.log('objTypes: ' + objTypes);
+            console.log('sfObjTypes: ' + sfObjTypes);
+            console.log('Layers: ');
+            console.log(Layers);
             
             var pleaseWait = '<li class="slds-listbox__item" role="presentation">Searching, please wait...</li>'
             var searchResults = "";
@@ -232,8 +254,7 @@
             
 
             var SearchTerm = inputBox.value;
-            if (SearchTerm && SearchTerm != null && SearchTerm != "" && typeof(SearchTerm) != 'undefined') {
-                SearchTerm = SearchTerm.toLowerCase();
+            //if (SearchTerm && SearchTerm != null && SearchTerm != "" && typeof(SearchTerm) != 'undefined') {
                 
                 searchResults = '<span class="slds-lookup__item-action slds-lookup__item-action--label" role="option" tabindex="1">'
                                     + '<svg aria-hidden="true" class="slds-icon slds-icon--x-small slds-icon-text-default">'
@@ -241,50 +262,89 @@
                                     + '</svg>'
                                     + '<span class="slds-truncate">"' + SearchTerm + '" in Layers</span>'
                                 + '</span>';
+            if (!isValueEmptyProto(SearchTerm)) {
+                SearchTerm = SearchTerm.toLowerCase();
             }
-            console.log('SearchTerm: ' + SearchTerm);
+            //console.log('SearchTerm: ' + SearchTerm);
 
 
             var objTypesSplit = objTypes.split(",");
             // for(var i=0; i < objTypesSplit.length; i++) {
             var type = objTypesSplit[0];
+            if (isValueEmptyProto(type)) {
+                for (var i = 0, len = objTypesSplit.length; i < len; i++) {
+                    if (!isValueEmptyProto(objTypesSplit[i])) {
+                        type = objTypesSplit[i];
+                        break;
+                    }
+                }
+            }
             type = type.toLowerCase();
-            console.log('type: ' + type);
+            //console.log('type: ' + type);
 
+            var layerTypeFiltered = Layers[type];
 
-            for(var i=0; i < Layers[type].length; i++) {
-                if(Layers[type][i].name.toLowerCase().startsWith(SearchTerm) || (type === 'live' && Layers[type][i].vendor.toLowerCase().startsWith(SearchTerm))) {
+            /*
+            console.log(type);
+            console.log(layerTypeFiltered);
+            console.log(sfObjTypes);
+            */
+            
+            if (!isValueEmptyProto(sfObjTypes)) {
+                var sfObjTypesSplit = sfObjTypes.split(",");
+                // for(var i=0; i < objTypesSplit.length; i++) {
+                var sfType = sfObjTypesSplit[0];
+                
+                if (isValueEmptyProto(sfType)) {
+                    for (var i = 0, len = sfObjTypesSplit.length; i < len; i++) {
+                        if (!isValueEmptyProto(sfObjTypesSplit[i])) {
+                            sfType = sfObjTypesSplit[i];
+                            break;
+                        }
+                    }
+                }
+                
+                if (!isValueEmptyProto(sfType)) {
+                    sfType = sfType.toLowerCase();
+                    layerTypeFiltered = layerTypeFiltered[sfType];
+                }
+            
+                /*
+                console.log(sfType);
+                console.log(layerTypeFiltered);
+                */
+            }
+
+            if (!isValueEmptyProto(layerTypeFiltered)) {
+                for(var i=0; i < layerTypeFiltered.length; i++) {
+                    var layerTypeFilteredIteration = layerTypeFiltered[i];
+                    
+                    //if(layerTypeFilteredIteration.name.toLowerCase().startsWith(SearchTerm) || (type === 'live' && layerTypeFilteredIteration.vendor.toLowerCase().startsWith(SearchTerm))) {
+                    if(layerTypeFilteredIteration.name.toLowerCase().indexOf(SearchTerm) != -1 || (type === 'live' && layerTypeFilteredIteration.vendor.toLowerCase().indexOf(SearchTerm) != -1)) {
 
                       var addlAttr = "";
 
                       searchResults += '<li class="slds-listbox__item" role="presentation" onmousedown="';
                         
                       if (type === 'live') {
-                          searchResults += 'itemSelected(\'' + id + '\',\'' + Layers[type][i].name + '\',\'' + Layers[type][i].id + '\',\'' + Layers[type][i].vendor + '\',\'' + type + '\',\'' + {!callbackFunc} + '\',true);">';
-                          addlAttr = ' - Vendor: ' + Layers[type][i].vendor;
+                              searchResults += 'itemSelected(\'' + id + '\',\'' + layerTypeFilteredIteration.name + '\',\'' + layerTypeFilteredIteration.id + '\',\'' + layerTypeFilteredIteration.vendor + '\',\'' + type + '\',\'' + {!callbackFunc} + '\',true,\'' + sfType + '\');">';
+                              addlAttr = ' - Vendor: ' + layerTypeFilteredIteration.vendor;
                       }
                       else {
-                            searchResults += 'itemSelected(\'' + id + '\',\'' + Layers[type][i].name + '\',\'' + Layers[type][i].id + '\',null,\'' + type + '\',null,false);">';
+                                searchResults += 'itemSelected(\'' + id + '\',\'' + layerTypeFilteredIteration.name + '\',\'' + layerTypeFilteredIteration.id + '\',null,\'' + type + '\',null,false,\'' + sfType + '\');">';
                       }
                       
-                      searchResults += '<span  class="slds-media slds-listbox__option slds-listbox__option_entity slds-listbox__option_has-meta" id="' + Layers[type][i].Id + '" role="option">' + 
-                                '<span class="slds-media__figure">' + 
-                                  '<span class="slds-icon_container slds-icon-standard-account" title="' + Layers[type][i].name + '">' + 
-                                    '<svg aria-hidden="true" class="slds-icon slds-icon_small"><use xlink:href="/apexpages/slds/latest/assets/icons/standard-sprite/svg/symbols.svg#account" xmlns:xlink="http://www.w3.org/1999/xlink"></use></svg>' + 
-                                    '<span class="slds-assistive-text">Description of icon</span>' + 
-                                  '</span>' + 
-                                '</span>' + 
-                                '<span class="slds-media__body">' + 
-                                  '<span class="slds-listbox__option-text slds-listbox__option-text_entity">' + Layers[type][i].name  + '</span>' +
-                                  '<span class="slds-listbox__option-meta slds-listbox__option-meta_entity">Folder: ' + Layers[type][i].folder  + '</span>' +
-                                  '<span class="slds-listbox__option-meta slds-listbox__option-meta_entity">Created: ' + new Date(Layers[type][i].createddate).toLocaleDateString() + addlAttr + '</span>' + 
-                                '</span>' +
-                            '</span>' + 
+                          searchResults += '<div class="slds-listbox__option slds-listbox__option_entity slds-listbox__option_has-meta" id="' + layerTypeFilteredIteration.Id + '" role="option">' + 
+                                      '<span class="slds-listbox__option-text slds-listbox__option-text_entity">' + layerTypeFilteredIteration.name  + '</span>' +
+                                      '<span class="slds-listbox__option-meta slds-listbox__option-meta_entity">Folder: ' + layerTypeFilteredIteration.folder  + '</span>' +
+                                      '<span class="slds-listbox__option-meta slds-listbox__option-meta_entity">Created: ' + new Date(layerTypeFilteredIteration.createddate).toLocaleDateString() + addlAttr + '</span>' + 
+                                    '</div>' +
                         '</li>';
                 }
                 
 
 
+                }
             }
 
             if(searchResults === "") {
@@ -335,7 +395,7 @@
                 }, 
                 {escape: true}
             );*/
-            console.log('end doSearch');
+            //console.log('end doSearch');
             document.getElementById(id + "_list-result-wrapper").innerHTML = searchResults;
                     
         }
@@ -358,33 +418,53 @@
             return folderPath.replace(/\s*>\s*$/, "");
         }
 
-        function loadLayers(callback) {
-            console.log('start loadLayers in component');
-            console.log(callback);
+        function loadLayers(callback, inputParamsMap, callbackInputParamsMap) {
+            //console.log('start loadLayers in component');
+            //console.log(callback);
             // first get all folders
             Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MALayerSearchComponentHelper.getFolders}',
                 function(result, event) {
+                    /*
                     console.log('start loadLayers callback');
                     console.log('>>> folder status: ' + event.status);
                     console.log('>>> folder message: ' + event.message);
                     console.log('>>> folder type: ' + event.type);
                     console.log('>>> folder where: ' + event.where);
                     console.log(result);
+                    */
                     folderIds = result;
 
                     // next get all layers
-                    getLayers(callback);
-                    console.log('end loadLayers callback');
+                    getLayers(callback, inputParamsMap, callbackInputParamsMap);
+                    //console.log('end loadLayers callback');
                 },
                 {escape: false}
             );
         }
 
-        function getLayers(callback) {
+        function getLayers(callback, inputParamsMap, callbackInputParamsMap) {
             console.log('retrieving layers');
+            console.log(inputParamsMap);
 
-            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MALayerSearchComponentHelper.getLayers}', 
-                '', "live,geofence",
+            /*
+            var inputParamsMap = {};
+            inputParamsMap['searchTerm'] = '';
+            //inputParamsMap['types'] = 'live,geofence,,marker';
+            inputParamsMap['types'] = '{!objTypes}';
+            
+            if (!isValueEmptyProto('{!sfObjTypes}')) {
+                inputParamsMap['objectTypes'] = '{!sfObjTypes}';
+            }
+            
+            if (!isValueEmptyProto({!filterOutVariables})) {
+                inputParamsMap['filterOutVariables'] = {!filterOutVariables};
+            }
+            */
+
+            //Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MALayerSearchComponentHelper.getLayers}', 
+                //'', "live,geofence,,marker",
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MALayerSearchComponentHelper.getLayersMoreOptions}', 
+                inputParamsMap,
                 function(result, event){
                     console.log('start getLayers callback');
                     console.log(result);
@@ -394,23 +474,61 @@
                             // var addlAttr = "";
 
                             // escape single quotes in rule names
-                            var name = result[i].Name.replace(/'/g, "\\'");
-                            console.log('name: ' + name);
+                            //var name = result[i].Name.replace(/'/g, "\\'");
+                            var name = result[i].Name.replace(/'/g, "&#8217;");
+                            //console.log('name: ' + name);
                         
                             if (folderIds) {
                                 var folderPath = createFolderPath(result[i]);
                             }
                         
-                            if(result[i].sma__BaseObject__r.sma__Type__c.toLowerCase() === 'live') {
+                            if(isValueEmptyProto(result[i].sma__BaseObject__r.sma__Type__c) || result[i].sma__BaseObject__r.sma__Type__c.toLowerCase() === 'marker') {
+                                Layers['marker'].push({'name' : name,
+                                                'type' : 'marker',
+                                                'vendor' : null,
+                                                'id' : result[i].Id,
+                                                'folder' : folderPath,
+                                                'createddate' : new Date(result[i].CreatedDate).toLocaleDateString(),
+                                                'geofencetype' : null,
+                                                'geofenceradius' : null,
+                                                'geofenceradiusunits' : null
+                                });
 
-                                console.log(result[i].sma__BaseObject__r.sma__Type__c);
-                                if(name == 'Another Device Layer') {debugger;}
+                                if(isValueEmptyProto(Layers['marker'][result[i].sma__BaseObject__r.Name.toLowerCase()])) {
+                                    Layers['marker'][result[i].sma__BaseObject__r.Name.toLowerCase()] = [];
+                                }
+                                
+                                Layers['marker'][result[i].sma__BaseObject__r.Name.toLowerCase()].push({'name' : name,
+                                                'type' : 'marker',
+                                                'vendor' : null,
+                                                'id' : result[i].Id,
+                                                'folder' : folderPath,
+                                                'createddate' : new Date(result[i].CreatedDate).toLocaleDateString(),
+                                                'geofencetype' : null,
+                                                'geofenceradius' : null,
+                                                'geofenceradiusunits' : null
+                                });
+                            }
+                            else if(result[i].sma__BaseObject__r.sma__Type__c.toLowerCase() === 'live') {
+
+                                //console.log(result[i].sma__BaseObject__r.sma__Type__c);
+                                Layers['live'].push({'name' : name,
+                                                    'type' : 'live',
+                                                    'vendor' : 'Multiple',
+                                                    'id' : result[i].Id,
+                                                    'folder' : folderPath,
+                                                    'createddate' : new Date(result[i].CreatedDate).toLocaleDateString(),
+                                                    'geofencetype' : null,
+                                                    'geofenceradius' : null,
+                                                    'geofenceradiusunits' : null
+                                        });
 
                                 if(result[i].sma__Saved_Query_Components__r) {
-                                    console.log(result[i].sma__Saved_Query_Components__r.length);
+                                    //console.log(result[i].sma__Saved_Query_Components__r.length);
 
                                     for(var j=0; j < result[i].sma__Saved_Query_Components__r.length; j++) {
                                         if(result[i].sma__Saved_Query_Components__r[j].sma__Value__c && result[i].sma__Saved_Query_Components__r[j].sma__Type__c.toLowerCase() === 'devicelayervendor') {
+                                            Layers['live'].splice(i,1);
 
                                             Layers['live'].push({'name' : name,
                                                             'type' : 'live',
@@ -427,7 +545,7 @@
                                 }
                                 else {
                                     // console.log("result[i].Id" + result[i].Id);
-                                    console.log(result[i].sma__AdvancedOptions__c);
+                                    //console.log(result[i].sma__AdvancedOptions__c);
                                     var advOptions = JSON.parse(result[i].sma__AdvancedOptions__c);
                                     if(advOptions != null && advOptions.hasOwnProperty('layerSubType') && advOptions['layerSubType'] !== "" && advOptions['layerSubType'] !== null && advOptions['layerSubType'].toLowerCase() === 'device') {  // "layerSubType" : "Device",
                                         
@@ -435,7 +553,7 @@
                                         if (layertypeoptions.hasOwnProperty('live-device')
                                                 && layertypeoptions['live-device'].hasOwnProperty('vendor')) {  // "layerTypeOptions" : "{\"live-device\":{\"vendor\":\"CalAmp\"}}",
 
-                                            debugger;
+                                            Layers['live'].splice(i,1);
 
                                             Layers['live'].push({'name' : name,
                                                             'type' : 'live',
@@ -479,7 +597,7 @@
                             }
                         }
                     }
-                    console.log('---Layers created!---');
+                    //console.log('---Layers created!---');
 
                     // this function sets search box value to saved layer value
                     // console.log(callback);
@@ -487,17 +605,106 @@
                         var fn = window[callback];
                         // console.log('typeof(fn)' + typeof(fn));
                         if (typeof(fn) === "function") {
+                            if (callback == 'SetCurrentLayer') {
+                                fn(callbackInputParamsMap);
+                            }
+                            else {
                             fn();
                         }
                     }
+                    }
 
-                    console.log('end getLayers callback');
+                    //console.log('end getLayers callback');
                 },
                 {escape: false}
             );
-            console.log('-- end getLayers --');
+            //console.log('-- end getLayers --');
 
         }
+        function SetCurrentLayer(callbackInputParamsMap) {
+            console.log('--SetCurrentLayer--');
+            var divId = callbackInputParamsMap['divId'];
+            var layerId = $('#' + divId).closest('.stopAssociationDiv').find('input[id $= hiddenLayerId]').val();
+            var objTypes = callbackInputParamsMap['objTypes'];
+            var sfObjTypes = callbackInputParamsMap['sfObjTypes'];
+
+            var objTypesSplit = objTypes.split(",");
+            var type = objTypesSplit[0];
+            
+            if (isValueEmptyProto(type)) {
+                for (var i = 0, len = objTypesSplit.length; i < len; i++) {
+                    if (!isValueEmptyProto(objTypesSplit[i])) {
+                        type = objTypesSplit[i];
+                        break;
+                    }
+                }
+            }
+            
+            type = type.toLowerCase();
+            
+            var layerTypeFiltered = Layers[type];
+            
+            if (!isValueEmptyProto(sfObjTypes)) {
+                var sfObjTypesSplit = sfObjTypes.split(",");
+                var sfType = sfObjTypesSplit[0];
+                
+                if (isValueEmptyProto(sfType)) {
+                    for (var i = 0, len = sfObjTypesSplit.length; i < len; i++) {
+                        if (!isValueEmptyProto(sfObjTypesSplit[i])) {
+                            sfType = sfObjTypesSplit[i];
+                            break;
+                        }
+                    }
+                }
+                
+                if (!isValueEmptyProto(sfType)) {
+                    sfType = sfType.toLowerCase();
+                    layerTypeFiltered = layerTypeFiltered[sfType];
+                }
+            }
+
+            if (!isValueEmptyProto(layerTypeFiltered)) {
+                for (var i = 0; i < layerTypeFiltered.length; i++) {
+                    if(layerTypeFiltered[i].id == layerId) {
+                        itemSelected(divId, layerTypeFiltered[i].name, layerTypeFiltered[i].id, layerTypeFiltered[i].vendor, type, '', false, sfObjTypes);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        $(function() {
+            var inputParamsMap = {};
+            inputParamsMap['searchTerm'] = '';
+            // inputParamsMap['types'] = 'Live, Geofence, Marker'; // or null is also Marker Layer
+            inputParamsMap['types'] = '{!objTypes}';
+            
+            if (!isValueEmptyProto('{!sfObjTypes}')) {
+                inputParamsMap['objectTypes'] = '{!sfObjTypes}';
+            }
+            
+            if (!isValueEmptyProto({!filterOutVariables})) {
+                inputParamsMap['filterOutVariables'] = {!filterOutVariables};
+            }
+            
+            if (!isValueEmptyProto({!requiresGeoLocation})) {
+                inputParamsMap['requiresGeoLocation'] = {!requiresGeoLocation};
+            }
+            
+            var divId = '{!sectionId}';
+            
+            var callbackInputParamsMap = {};
+            callbackInputParamsMap['divId'] = '{!sectionId}';
+            callbackInputParamsMap['objTypes'] = '{!objTypes}';
+            callbackInputParamsMap['sfObjTypes'] = '{!sfObjTypes}';
+            
+            if ($('#' + divId).closest('.stopAssociationDiv').length > 0) {
+                loadLayers("SetCurrentLayer", inputParamsMap, callbackInputParamsMap);
+            }
+            else {
+                loadLayers("SetLayer", inputParamsMap);
+            }
+        });
         
     </script>
 
